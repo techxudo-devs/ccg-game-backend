@@ -20,7 +20,7 @@ app.use(
     origin: [
       origin,
       "http://localhost:5174",
-      "https://ccg-game-app.netlify.app",
+      "https://precision-firearm-game.netlify.app",
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE"],
