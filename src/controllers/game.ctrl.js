@@ -184,6 +184,60 @@ const GameController = {
       return res.status(500).json({ message: "Internal server error" });
     }
   },
+
+  DeleteGame: async (req, res) => {
+    try {
+      const gameId = req.params.gameId;
+      if (!gameId) {
+        return res.status(400).json({ message: "Please provide the gameId" });
+      }
+      const game = await GameModel.findById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+
+      if (game.status != "ended") {
+        return res
+          .status(400)
+          .json({ message: "Game is still active, cannot delete" });
+      }
+
+      await GameModel.findByIdAndDelete(gameId);
+      return res.status(200).json({ message: "Game deleted successfully" });
+    } catch (error) {
+      res.status(500).json({
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  },
+  UpdatePinnedStatus: async (req, res) => {
+    try {
+      const gameId = req.params.gameId;
+      const { isPinned } = req.body;
+
+      if (typeof isPinned !== "boolean") {
+        return res.status(400).json({ message: "Invalid request body" });
+      }
+
+      const game = await GameModel.findById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+
+      game.isPinned = isPinned;
+      await game.save();
+
+      return res
+        .status(200)
+        .json({ message: "Pinned status updated successfully" });
+    } catch (error) {
+      res.status(500).json({
+        message: "Internal server error",
+        error: error.message,
+      });
+    }
+  },
 };
 
 module.exports = GameController;

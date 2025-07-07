@@ -2,11 +2,25 @@ const express = require("express");
 const GameRoute = express.Router();
 
 const GameController = require("../controllers/game.ctrl");
+const authMiddleware = require("../middleware/auth");
+const RoleValidation = require("../middleware/roleValidator");
 
 GameRoute.get("/getGameById/:gameId", GameController.GetGame);
 GameRoute.get("/listActiveGames", GameController.ListActiveGames);
 GameRoute.get("/listNonActiveGames", GameController.ListNonActiveGames);
 GameRoute.get("/listLatestGame", GameController.ListLatestNonActiveGame);
 GameRoute.get("/leaderboard/:gameId", GameController.GetLeaderboard);
+GameRoute.delete(
+  "/deleteGame/:gameId",
+  authMiddleware,
+  RoleValidation(["admin"]),
+  GameController.DeleteGame
+);
+GameRoute.put(
+  "/updatePinnedStatus/:gameId",
+  authMiddleware,
+  RoleValidation(["admin"]),
+  GameController.UpdatePinnedStatus
+);
 
 module.exports = GameRoute;
