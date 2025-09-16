@@ -62,5 +62,25 @@ AdminRoute.post(
   handleImageUpload,
   AdminController.uploadImage
 );
+AdminRoute.get(
+  "/getAllUsers",
+  authMiddleware,
+  RoleValidation(["admin"]),
+  AdminController.getAllUsers
+);
+
+AdminRoute.get(
+  "/settings",
+  authMiddleware,
+  RoleValidation(["admin"]),
+  AdminController.getSettings
+);
+
+AdminRoute.put(
+  "/settings",
+  authMiddleware,
+  RoleValidation(["admin"]),
+  AdminController.updateSettings
+);
 
 module.exports = AdminRoute;

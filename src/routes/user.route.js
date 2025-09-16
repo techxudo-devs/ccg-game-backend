@@ -22,5 +22,6 @@ UserRoute.post(
 UserRoute.post("/test-book-seat", authMiddleware, UserController.TestBookSeat); // Test route for direct booking
 UserRoute.post("/select-seat", authMiddleware, UserController.SelectSeat);
 UserRoute.put("/update-profile", authMiddleware, UserController.UpdateProfile);
+UserRoute.put("/update-address", authMiddleware, UserController.updateAddress);
 
 module.exports = UserRoute;

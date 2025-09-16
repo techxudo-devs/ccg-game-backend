@@ -1,12 +1,14 @@
-const UserModel = require('../models/user.model');
-const RequestModel = require('../models/request.model');
-const GameModel = require('../models/game.model');
-const SeatModel = require('../models/seat.model');
-const PaymentService = require('../services/payment.service');
-const EmailService = require('../services/Email.service');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
-const axios = require('axios');
+const UserModel = require("../models/user.model");
+const RequestModel = require("../models/request.model");
+const GameModel = require("../models/game.model");
+const SeatModel = require("../models/seat.model");
+const SettingModel = require("../models/Setting.model");
+const { sendStatusUpdate } = require("../services/Email.service");
+const PaymentService = require("../services/payment.service");
+const EmailService = require("../services/Email.service");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
+const axios = require("axios");
 
 const UserController = {
   TestBookSeat: async (req, res) => {
@@ -14,27 +16,35 @@ const UserController = {
     const userId = req.user._id;
 
     if (!gameId || !seatNumber) {
-      return res.status(400).json({ message: "Please provide gameId and seatNumber" });
+      return res
+        .status(400)
+        .json({ message: "Please provide gameId and seatNumber" });
     }
 
     try {
-      const game = await GameModel.findById(gameId).populate('seats');
+      const game = await GameModel.findById(gameId).populate("seats");
       if (!game) {
         return res.status(404).json({ message: "Game not found" });
       }
 
-      if (game.status === 'ended') {
+      if (game.status === "ended") {
         return res.status(400).json({ message: "Game has already ended" });
       }
 
       // Check if user has already booked a seat in this game
-      const existingBooking = game.seats.find(seat => seat.userId && seat.userId.toString() === userId.toString());
+      const existingBooking = game.seats.find(
+        (seat) => seat.userId && seat.userId.toString() === userId.toString()
+      );
       if (existingBooking) {
-        return res.status(400).json({ message: "You have already booked a seat in this game" });
+        return res
+          .status(400)
+          .json({ message: "You have already booked a seat in this game" });
       }
 
       // Find the selected seat
-      const seat = game.seats.find(seat => seat.seatNumber === Number(seatNumber));
+      const seat = game.seats.find(
+        (seat) => seat.seatNumber === Number(seatNumber)
+      );
       if (!seat) {
         return res.status(404).json({ message: "Seat not found" });
       }
@@ -47,25 +57,26 @@ const UserController = {
       await SeatModel.findByIdAndUpdate(seat._id, {
         isOccupied: true,
         userId: userId,
-        BookedAt: new Date()
+        BookedAt: new Date(),
       });
 
       // Check if all seats are occupied
-      const updatedGame = await GameModel.findById(gameId).populate('seats');
-      const allSeatsOccupied = updatedGame.seats.every(seat => seat.isOccupied);
+      const updatedGame = await GameModel.findById(gameId).populate("seats");
+      const allSeatsOccupied = updatedGame.seats.every(
+        (seat) => seat.isOccupied
+      );
       if (allSeatsOccupied) {
-        updatedGame.status = 'ended';
+        updatedGame.status = "ended";
         await updatedGame.save();
       }
 
       return res.status(200).json({
         message: "Seat booked successfully (TEST MODE)",
         seat: await SeatModel.findById(seat._id),
-        gameStatus: updatedGame.status
+        gameStatus: updatedGame.status,
       });
-
     } catch (error) {
-      console.error('Error in TestBookSeat:', error);
+      console.error("Error in TestBookSeat:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
   },
@@ -74,14 +85,14 @@ const UserController = {
     try {
       const { email, role } = req.body;
 
-      if (!email || !role || typeof email !== 'string') {
+      if (!email || !role || typeof email !== "string") {
         return res.status(400).json({ message: "Invalid email or role" });
       }
 
       // Find user with email and role
       const user = await UserModel.findOne({
         email: email.trim(),
-        role: role.trim()
+        role: role.trim(),
       });
 
       if (!user) {
@@ -115,11 +126,13 @@ const UserController = {
 
       const user = await UserModel.findOne({
         email,
-        resetPasswordOTPExpiry: { $gt: Date.now() }
+        resetPasswordOTPExpiry: { $gt: Date.now() },
       });
 
       if (!user) {
-        return res.status(400).json({ message: "Invalid request or OTP expired" });
+        return res
+          .status(400)
+          .json({ message: "Invalid request or OTP expired" });
       }
 
       // Verify OTP
@@ -130,9 +143,9 @@ const UserController = {
 
       // Generate temporary token for password reset
       const tempToken = jwt.sign(
-        { userId: user._id, purpose: 'reset-password' },
+        { userId: user._id, purpose: "reset-password" },
         process.env.JWT_SECRET,
-        { expiresIn: '10m' }
+        { expiresIn: "10m" }
       );
 
       res.status(200).json({ message: "OTP verified successfully", tempToken });
@@ -144,7 +157,7 @@ const UserController = {
   resetPassword: async (req, res) => {
     try {
       const { newPassword } = req.body;
-      const tempToken = req.headers.authorization?.split(' ')[1];
+      const tempToken = req.headers.authorization?.split(" ")[1];
 
       if (!tempToken) {
         return res.status(401).json({ message: "No token provided" });
@@ -152,7 +165,7 @@ const UserController = {
 
       // Verify temp token
       const decoded = jwt.verify(tempToken, process.env.JWT_SECRET);
-      if (decoded.purpose !== 'reset-password') {
+      if (decoded.purpose !== "reset-password") {
         return res.status(401).json({ message: "Invalid token" });
       }
 
@@ -170,10 +183,10 @@ const UserController = {
       res.status(200).json({ message: "Password reset successful" });
     } catch (error) {
       console.error("Password reset error:", error);
-      if (error.name === 'JsonWebTokenError') {
+      if (error.name === "JsonWebTokenError") {
         return res.status(401).json({ message: "Invalid token" });
       }
-      if (error.name === 'TokenExpiredError') {
+      if (error.name === "TokenExpiredError") {
         return res.status(401).json({ message: "Token expired" });
       }
       res.status(500).json({ message: "Error resetting password" });
@@ -181,8 +194,8 @@ const UserController = {
   },
 
   register: async (req, res) => {
-    const { username, password, email, role } = req.body;
-    if (!username || !password || !email || !role) {
+    const { username, password, email, role, name, address } = req.body;
+    if (!username || !password || !email || !role || !name) {
       return res.status(400).json({ message: "Please fill all the fields" });
     }
     try {
@@ -195,7 +208,9 @@ const UserController = {
         username,
         password,
         email,
-        role
+        role,
+        name,
+        address: address || "",
       });
       await newUser.save();
       return res.status(201).json({ message: "User created successfully" });
@@ -210,12 +225,11 @@ const UserController = {
       return res.status(400).json({ message: "Please fill all the fields" });
     }
     try {
-
-      if (role !== 'user' && role !== 'admin') {
+      if (role !== "user" && role !== "admin") {
         return res.status(400).json({ message: "Invalid role" });
       }
 
-      if (role === 'admin') {
+      if (role === "admin") {
         const admin = await UserModel.findOne({ email, role });
         if (!admin) {
           return res.status(400).json({ message: "Admin not found" });
@@ -225,7 +239,15 @@ const UserController = {
           return res.status(400).json({ message: "Invalid credentials" });
         }
         const token = admin.generateAuthToken();
-        return res.status(200).json({ token, user: { id: admin._id, username: admin.username, email: admin.email, role: admin.role } });
+        return res.status(200).json({
+          token,
+          user: {
+            id: admin._id,
+            username: admin.username,
+            email: admin.email,
+            role: admin.role,
+          },
+        });
       }
 
       const user = await UserModel.findOne({ email, role });
@@ -237,8 +259,17 @@ const UserController = {
         return res.status(400).json({ message: "Invalid credentials" });
       }
       const token = user.generateAuthToken();
-      return res.status(200).json({ token, user: { id: user._id, username: user.username, email: user.email, role: user.role } });
-
+      return res.status(200).json({
+        token,
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          name: user.name,
+          address: user.address,
+        },
+      });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ message: "Internal server error" });
@@ -258,7 +289,7 @@ const UserController = {
 
       const newRequest = new RequestModel({
         userId,
-        gameId
+        gameId,
       });
 
       if (!newRequest) {
@@ -271,41 +302,68 @@ const UserController = {
       if (!game) {
         return res.status(400).json({ message: "Game not found" });
       }
+
+      // Check for auto-approval setting
+      const settings = await SettingModel.findOne();
+      if (settings && settings.autoAcceptRequests) {
+        newRequest.status = "approved";
+        await newRequest.save();
+
+        game.Approved_Users.push(userId);
+
+        const user = await UserModel.findById(userId);
+        if (user && user.email) {
+          const subject = "Request Approved";
+          const text =
+            "Your request to join the game has been automatically approved.";
+          await sendStatusUpdate(user.email, subject, text);
+        }
+
+        await game.save();
+        return res
+          .status(200)
+          .json({ message: "Request automatically approved" });
+      }
+
+      // Original behavior: save as pending
       game.Pending_Requests.push(newRequest._id);
       await game.save();
       return res.status(201).json({ message: "Request created successfully" });
-
     } catch (error) {
       return res.status(500).json({ message: error.message });
     }
   },
   CreatePaymentIntent: async (req, res) => {
     const { gameId, seatNumber } = req.body;
-    console.log('Received gameId:', gameId);
-    console.log('Received seatNumber:', seatNumber, 'Type:', typeof seatNumber);
+    console.log("Received gameId:", gameId);
+    console.log("Received seatNumber:", seatNumber, "Type:", typeof seatNumber);
     try {
-      const game = await GameModel.findById(gameId).populate('seats');
+      const game = await GameModel.findById(gameId).populate("seats");
       if (!game) {
         return res.status(404).json({ message: "Game not found" });
       }
 
-      if (game.status === 'ended') {
+      if (game.status === "ended") {
         return res.status(400).json({ message: "Game has already ended" });
       }
 
-      console.log('Found game:', game);
-      console.log('Game seats:', JSON.stringify(game.seats, null, 2));
+      console.log("Found game:", game);
+      console.log("Game seats:", JSON.stringify(game.seats, null, 2));
 
       // Log each seat's number and type for debugging
-      game.seats.forEach(seat => {
+      game.seats.forEach((seat) => {
         console.log(`Seat ${seat._id}:`, {
           seatNumber: seat.seatNumber,
-          type: typeof seat.seatNumber
+          type: typeof seat.seatNumber,
         });
       });
 
-      const seat = game.seats.find(seat => {
-        console.log(`Comparing: ${seat.seatNumber} (${typeof seat.seatNumber}) === ${seatNumber} (${typeof seat.seatNumber})`);
+      const seat = game.seats.find((seat) => {
+        console.log(
+          `Comparing: ${
+            seat.seatNumber
+          } (${typeof seat.seatNumber}) === ${seatNumber} (${typeof seat.seatNumber})`
+        );
         return seat.seatNumber === Number(seatNumber);
       });
 
@@ -317,15 +375,21 @@ const UserController = {
         return res.status(400).json({ message: "Seat is already occupied" });
       }
 
-      const paymentIntent = await PaymentService.createPaymentIntent(seat.price, seat._id, gameId);
+      const paymentIntent = await PaymentService.createPaymentIntent(
+        seat.price,
+        seat._id,
+        gameId
+      );
 
       return res.status(200).json({
         clientSecret: paymentIntent.client_secret,
-        amount: seat.price
+        amount: seat.price,
       });
     } catch (error) {
-      console.error('Error in CreatePaymentIntent:', error);
-      return res.status(500).json({ message: "Failed to create payment intent" });
+      console.error("Error in CreatePaymentIntent:", error);
+      return res
+        .status(500)
+        .json({ message: "Failed to create payment intent" });
     }
   },
 
@@ -334,27 +398,35 @@ const UserController = {
     const userId = req.user._id;
 
     if (!gameId || !seatNumber || !paymentIntentId) {
-      return res.status(400).json({ message: "Please provide all required fields" });
+      return res
+        .status(400)
+        .json({ message: "Please provide all required fields" });
     }
 
     try {
-      const game = await GameModel.findOne({ gameId }).populate('seats');
+      const game = await GameModel.findOne({ gameId }).populate("seats");
       if (!game) {
         return res.status(404).json({ message: "Game not found" });
       }
 
-      if (game.status === 'ended') {
+      if (game.status === "ended") {
         return res.status(400).json({ message: "Game has already ended" });
       }
 
       // Check if user has already booked a seat in this game
-      const existingBooking = game.seats.find(seat => seat.userId && seat.userId.toString() === userId.toString());
+      const existingBooking = game.seats.find(
+        (seat) => seat.userId && seat.userId.toString() === userId.toString()
+      );
       if (existingBooking) {
-        return res.status(400).json({ message: "You have already booked a seat in this game" });
+        return res
+          .status(400)
+          .json({ message: "You have already booked a seat in this game" });
       }
 
       // Find the selected seat
-      const seat = game.seats.find(seat => seat.seatNumber === Number(seatNumber));
+      const seat = game.seats.find(
+        (seat) => seat.seatNumber === Number(seatNumber)
+      );
       if (!seat) {
         return res.status(404).json({ message: "Seat not found" });
       }
@@ -366,34 +438,43 @@ const UserController = {
       // Confirm payment intent first
       try {
         await PaymentService.confirmPaymentIntent(paymentIntentId);
-        await PaymentService.recordPayment(userId, seat.price, paymentIntentId, seat._id, gameId);
+        await PaymentService.recordPayment(
+          userId,
+          seat.price,
+          paymentIntentId,
+          seat._id,
+          gameId
+        );
       } catch (error) {
-        return res.status(400).json({ message: "Payment failed: " + error.message });
+        return res
+          .status(400)
+          .json({ message: "Payment failed: " + error.message });
       }
 
       // Update seat status
       await SeatModel.findByIdAndUpdate(seat._id, {
         isOccupied: true,
         userId: userId,
-        BookedAt: new Date()
+        BookedAt: new Date(),
       });
 
       // Check if all seats are occupied
-      const updatedGame = await GameModel.findOne({ gameId }).populate('seats');
-      const allSeatsOccupied = updatedGame.seats.every(seat => seat.isOccupied);
+      const updatedGame = await GameModel.findOne({ gameId }).populate("seats");
+      const allSeatsOccupied = updatedGame.seats.every(
+        (seat) => seat.isOccupied
+      );
       if (allSeatsOccupied) {
-        updatedGame.status = 'ended';
+        updatedGame.status = "ended";
         await updatedGame.save();
       }
 
       return res.status(200).json({
         message: "Seat booked successfully",
         seat: await SeatModel.findById(seat._id),
-        gameStatus: updatedGame.status
+        gameStatus: updatedGame.status,
       });
-
     } catch (error) {
-      console.error('Error in SelectSeat:', error);
+      console.error("Error in SelectSeat:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
   },
@@ -403,11 +484,16 @@ const UserController = {
     const userId = req.user._id;
 
     if (!transactionId || !cardDetails) {
-      return res.status(400).json({ message: "Please provide all required fields" });
+      return res
+        .status(400)
+        .json({ message: "Please provide all required fields" });
     }
 
     // Validate card details
-    if (!cardDetails.number || !/^\d{16}$/.test(cardDetails.number.replace(/\s/g, ''))) {
+    if (
+      !cardDetails.number ||
+      !/^\d{16}$/.test(cardDetails.number.replace(/\s/g, ""))
+    ) {
       return res.status(400).json({ message: "Invalid card number" });
     }
     if (!cardDetails.expiry || !/^\d{4}$/.test(cardDetails.expiry)) {
@@ -419,43 +505,47 @@ const UserController = {
 
     try {
       // Process payment with SwipeSimple
-      const response = await axios.post('https://api.swipesimple.com/v1/transactions/process', {
-        transaction_id: transactionId,
-        card: {
-          number: cardDetails.number,
-          expiry: cardDetails.expiry,
-          cvc: cardDetails.cvc
+      const response = await axios.post(
+        "https://api.swipesimple.com/v1/transactions/process",
+        {
+          transaction_id: transactionId,
+          card: {
+            number: cardDetails.number,
+            expiry: cardDetails.expiry,
+            cvc: cardDetails.cvc,
+          },
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.SWIPESIMPLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
         }
-      }, {
-        headers: {
-          'Authorization': `Bearer ${process.env.SWIPESIMPLE_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      );
 
-      if (response.data.status === 'completed') {
+      if (response.data.status === "completed") {
         return res.status(200).json({
-          status: 'success',
-          message: 'Payment processed successfully'
+          status: "success",
+          message: "Payment processed successfully",
         });
       } else {
         return res.status(400).json({
-          status: 'failed',
-          message: 'Payment processing failed'
+          status: "failed",
+          message: "Payment processing failed",
         });
       }
     } catch (error) {
-      console.error('Error processing payment:', error);
+      console.error("Error processing payment:", error);
       return res.status(500).json({
-        status: 'failed',
-        message: error.response?.data?.message || 'Failed to process payment'
+        status: "failed",
+        message: error.response?.data?.message || "Failed to process payment",
       });
     }
   },
 
   UpdateProfile: async (req, res) => {
     const userId = req.user._id;
-    const { username, email, currentPassword, newPassword } = req.body;
+    const { username, email, name, currentPassword, newPassword } = req.body;
 
     try {
       const user = await UserModel.findById(userId);
@@ -466,12 +556,17 @@ const UserController = {
       // Verify current password
       const isValidPassword = await user.comparePassword(currentPassword);
       if (!isValidPassword) {
-        return res.status(401).json({ message: "Current password is incorrect" });
+        return res
+          .status(401)
+          .json({ message: "Current password is incorrect" });
       }
 
       // Check if email is already taken by another user
       if (email !== user.email) {
-        const emailExists = await UserModel.findOne({ email, _id: { $ne: userId } });
+        const emailExists = await UserModel.findOne({
+          email,
+          _id: { $ne: userId },
+        });
         if (emailExists) {
           return res.status(400).json({ message: "Email is already in use" });
         }
@@ -479,15 +574,21 @@ const UserController = {
 
       // Check if username is already taken by another user
       if (username !== user.username) {
-        const usernameExists = await UserModel.findOne({ username, _id: { $ne: userId } });
+        const usernameExists = await UserModel.findOne({
+          username,
+          _id: { $ne: userId },
+        });
         if (usernameExists) {
-          return res.status(400).json({ message: "Username is already in use" });
+          return res
+            .status(400)
+            .json({ message: "Username is already in use" });
         }
       }
 
       // Update user data
       user.username = username;
       user.email = email;
+      user.name = name;
       if (newPassword) {
         user.password = newPassword;
       }
@@ -503,15 +604,39 @@ const UserController = {
           id: user._id,
           username: user.username,
           email: user.email,
-          role: user.role
+          role: user.role,
+          name: user.name,
         },
-        token
+        token,
       });
     } catch (error) {
-      console.error('Error updating profile:', error);
+      console.error("Error updating profile:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
-  }
-}
+  },
+
+  updateAddress: async (req, res) => {
+    const userId = req.user._id;
+    const { address } = req.body;
+
+    try {
+      const user = await UserModel.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      user.address = address || "";
+      await user.save();
+
+      return res.status(200).json({
+        message: "Address updated successfully",
+        address: user.address,
+      });
+    } catch (error) {
+      console.error("Error updating address:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  },
+};
 
 module.exports = UserController;

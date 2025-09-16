@@ -17,6 +17,14 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  name: {
+    type: String,
+    required: true,
+  },
+  address: {
+    type: String,
+    default: '',
+  },
   resetPasswordOTP: {
     type: String,
   },
