@@ -180,7 +180,7 @@ const AdminController = {
         .json({ message: "Please provide the correct number of seats" });
     }
 
-    if (!totalSeats || !freeSeats || !paidSeats || !gameName) {
+    if (!totalSeats || !freeSeats || !gameName) {
       return res.status(400).json({ message: "Please provide all the fields" });
     }
 
@@ -339,55 +339,86 @@ const AdminController = {
   },
   RequestStatusUpdate: async (req, res) => {
     const requestId = req.params.requestId;
-    const { status } = req.body;
+    const { status } = req.body; // 'approved' or 'rejected'
+
     if (!requestId || !status) {
       return res
         .status(400)
         .json({ message: "Please provide the requestId and status" });
     }
+
+    if (status !== "approved" && status !== "rejected") {
+      return res
+        .status(400)
+        .json({
+          message: "Please provide a valid status (approved or rejected)",
+        });
+    }
+
     try {
       const request = await RequestModel.findById(requestId);
       if (!request) {
         return res.status(404).json({ message: "Request not found" });
       }
 
-      if (request.status === "approved") {
-        return res.status(400).json({ message: "Request already approved" });
-      }
-      if (request.status === "rejected") {
-        return res.status(400).json({ message: "Request already rejected" });
+      const game = await GameModel.findById(request.gameId);
+      if (!game) {
+        return res.status(404).json({ message: "Associated game not found" });
       }
 
-      if (status !== "approved" && status !== "rejected") {
+      const user = await UserModel.findById(request.userId);
+      if (!user) {
+        return res.status(404).json({ message: "Associated user not found" });
+      }
+
+      const previousStatus = request.status;
+
+      // No need to do anything if the status is not changing
+      if (previousStatus === status) {
         return res
-          .status(400)
-          .json({ message: "Please provide a valid status" });
+          .status(200)
+          .json({ message: `Request is already ${status}` });
       }
 
+      // --- CORE LOGIC FOR REVERSALS ---
+
+      // 1. Update the request's status
       request.status = status;
       await request.save();
 
+      // 2. Handle the change in the Game's Approved_Users array
       if (status === "approved") {
-        const game = await GameModel.findById(request.gameId);
-        if (!game) {
-          return res.status(404).json({ message: "Game not found" });
+        // Add user to approved list if not already there
+        if (!game.Approved_Users.includes(request.userId)) {
+          game.Approved_Users.push(request.userId);
         }
-        game.Approved_Users.push(request.userId);
-        await game.save();
-        const user = await UserModel.findById(request.userId);
-        if (!user) {
-          return res.status(404).json({ message: "User not found" });
-        }
+
+        // Send approval email
         const email = user.email;
-        const subject = "Request Approved";
-        const text = "Your request has been approved";
+        const subject = "Your Game Request has been Approved";
+        const text = `Congratulations! Your request to join the game "${game.gameName}" has been approved.`;
         await sendStatusUpdate(email, subject, text);
+      } else if (status === "rejected") {
+        // Remove user from approved list
+        game.Approved_Users = game.Approved_Users.filter(
+          (userId) => !userId.equals(request.userId)
+        );
+
+        // Optional: Send rejection email
+        // const email = user.email;
+        // const subject = "Update on your Game Request";
+        // const text = `Unfortunately, your request to join the game "${game.gameName}" has been rejected.`;
+        // await sendStatusUpdate(email, subject, text);
       }
+
+      // 3. Save the changes to the game document
+      await game.save();
+
       return res
         .status(200)
         .json({ message: "Request status updated successfully" });
     } catch (error) {
-      console.error(error);
+      console.error("Error in RequestStatusUpdate:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
   },
@@ -521,11 +552,9 @@ const AdminController = {
     const { autoAcceptRequests } = req.body;
 
     if (typeof autoAcceptRequests !== "boolean") {
-      return res
-        .status(400)
-        .json({
-          message: "Please provide a boolean value for autoAcceptRequests",
-        });
+      return res.status(400).json({
+        message: "Please provide a boolean value for autoAcceptRequests",
+      });
     }
 
     try {
