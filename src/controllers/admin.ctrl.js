@@ -515,12 +515,10 @@ const AdminController = {
   },
 
   getAllUsers: async (req, res) => {
-    const limit = req.query.limit ? parseInt(req.query.limit) : 20;
 
     try {
       const users = await UserModel.find()
-        .select("_id username email role name address")
-        .limit(limit)
+        .select("_id username email role name address createdAt")
         .sort({ createdAt: -1 });
 
       if (!users) return res.status(404).json({ message: "No User Found" });
