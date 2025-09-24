@@ -7,6 +7,159 @@ const UserModel = require("../models/user.model");
 const { uploadToCloudinary } = require("../config/cloudinary");
 
 const AdminController = {
+  declareRandomWinners: async (req, res) => {
+    const { gameId, winnerCount } = req.body;
+
+    if (!gameId || !winnerCount) {
+      return res
+        .status(400)
+        .json({ message: "Please provide gameId and winnerCount" });
+    }
+
+    const count = parseInt(winnerCount, 10);
+    if (isNaN(count) || count <= 0) {
+      return res
+        .status(400)
+        .json({ message: "Winner count must be a positive number." });
+    }
+
+    try {
+      const game = await GameModel.findById(gameId).populate("seats");
+
+      if (!game) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+
+      if (game.status !== "ended") {
+        return res
+          .status(400)
+          .json({ message: "Game must be ended before declaring winners" });
+      }
+
+      // Find all occupied seats that are not already winners
+      const eligibleSeats = await SeatModel.find({
+        _id: { $in: game.seats },
+        isOccupied: true,
+        isWinner: false,
+      });
+
+      if (eligibleSeats.length < count) {
+        return res.status(400).json({
+          message: `Not enough eligible participants to select ${count} winners. Only ${eligibleSeats.length} found.`,
+        });
+      }
+
+      // Fisher-Yates (aka Knuth) Shuffle to get random winners
+      for (let i = eligibleSeats.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [eligibleSeats[i], eligibleSeats[j]] = [
+          eligibleSeats[j],
+          eligibleSeats[i],
+        ];
+      }
+
+      const randomWinners = eligibleSeats.slice(0, count);
+      const seatIds = randomWinners.map((seat) => seat._id);
+
+      // Update all selected seats as winners
+      await SeatModel.updateMany(
+        { _id: { $in: seatIds } },
+        {
+          isWinner: true,
+          declaredWinnerAt: new Date(),
+        }
+      );
+
+      // Notify winners via email
+      const winners = await SeatModel.find({ _id: { $in: seatIds } }).populate(
+        "userId"
+      );
+      for (const seat of winners) {
+        if (seat.userId && seat.userId.email) {
+          const subject = `🏆 Congrulations! You're Winner in ${seat.gameName}`;
+
+          const emailBody = `
+          <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Congratulations, Winner!</title>
+          <style>
+              @media screen and (max-width: 600px) {
+                  .container { width: 100% !important; }
+                  .content { padding: 20px !important; }
+                  .hero-heading { font-size: 28px !important; }
+                  .seat-number { font-size: 48px !important; }
+              }
+          </style>
+      </head>
+      <body style="margin: 0; padding: 0; background-color: #f0f4f8;">
+          <table border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                  <td align="center" style="padding: 20px 0;">
+                      <table class="container" border="0" cellpadding="0" cellspacing="0" width="600" style="background-color: #0D1CA2; border-radius: 16px; color: #ffffff; font-family: Arial, sans-serif; box-shadow: 0 10px 25px rgba(0,0,0,0.3);">
+                          <tr>
+                              <td align="center" style="padding: 30px 20px 20px 20px;">
+                                  <img src="https://your-server.com/logo.png" alt="Your Game Logo" width="150" style="display: block;">
+                              </td>
+                          </tr>
+                          <tr>
+                              <td class="content" align="center" style="padding: 20px 40px;">
+                                  <h1 class="hero-heading" style="margin: 0; font-size: 36px; font-weight: bold; color: #E2C27B; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                                      🏆 Congratulations, ${
+                                        seat.userId.username
+                                      }!
+                                  </h1>
+                                  <p style="margin: 10px 0 30px 0; font-size: 16px; color: #ffffff; opacity: 0.8;">
+                                      You've been declared a winner in the game: <strong>${
+                                        seat.gameName
+                                      }</strong>.
+                                  </p>
+                                  <div style="background-color: rgba(226, 194, 123, 0.1); border: 2px solid #E2C27B; border-radius: 12px; padding: 20px; margin-bottom: 30px;">
+                                      <p style="margin: 0; font-size: 14px; color: #E2C27B; text-transform: uppercase; letter-spacing: 1px;">Your Winning Seat</p>
+                                      <p class="seat-number" style="margin: 10px 0 0 0; font-size: 64px; font-weight: bold; color: #E2C27B; line-height: 1;">
+                                          ${seat.seatNumber}
+                                      </p>
+                                  </div>
+                                  <p style="margin: 0 0 30px 0; font-size: 16px; color: #ffffff; opacity: 0.9;">
+                                      Your prize: <strong>${
+                                        seat.gift || "A fantastic surprise!"
+                                      }</strong> will be sent to you shortly. Keep an eye on your email for more details!
+                                  </p>
+                                  <a href="https://your-app.com/leaderboard/${
+                                    seat.gameId
+                                  }" target="_blank" style="display: inline-block; background-color: #29B79B; color: #ffffff; font-size: 16px; font-weight: bold; text-decoration: none; padding: 14px 28px; border-radius: 8px; transition: all 0.3s;">
+                                      View Game Leaderboard
+                                  </a>
+                              </td>
+                          </tr>
+                         
+                      </table>
+                  </td>
+              </tr>
+          </table>
+      </body>
+      </html>`;
+          await sendStatusUpdate(seat.userId.email, subject, emailBody);
+        }
+      }
+
+      return res.status(200).json({
+        message: "Random winners declared successfully",
+        winners: winners.map((seat) => ({
+          seatNumber: seat.seatNumber,
+          userName: seat.userId ? seat.userId.username : "Unknown",
+        })),
+      });
+    } catch (error) {
+      console.error("Error declaring random winners:", error);
+      return res
+        .status(500)
+        .json({ message: "Failed to declare random winners" });
+    }
+  },
+
   declareWinners: async (req, res) => {
     const { gameId, seatIds } = req.body;
 

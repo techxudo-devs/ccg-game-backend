@@ -13,6 +13,12 @@ AdminRoute.post(
   AdminController.createGame
 );
 AdminRoute.post(
+  "/declare-random-winners",
+  authMiddleware,
+  RoleValidation(["admin"]),
+  AdminController.declareRandomWinners
+);
+AdminRoute.post(
   "/declareWinners",
   authMiddleware,
   RoleValidation(["admin"]),
