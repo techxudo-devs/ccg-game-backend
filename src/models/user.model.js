@@ -1,6 +1,6 @@
-const mongoose = require('mongoose');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
+const mongoose = require("mongoose");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
 
 const userSchema = new mongoose.Schema({
   username: {
@@ -19,11 +19,11 @@ const userSchema = new mongoose.Schema({
   },
   name: {
     type: String,
-    required: true,
+    required: false,
   },
   address: {
     type: String,
-    default: '',
+    default: "",
   },
   resetPasswordOTP: {
     type: String,
@@ -37,14 +37,14 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['user', 'admin'],
-    default: 'user',
-  }
+    enum: ["user", "admin"],
+    default: "user",
+  },
 });
 
 // Hash password before saving
-userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
+userSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next();
 
   try {
     const salt = await bcrypt.genSalt(10);
@@ -62,13 +62,17 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 
 userSchema.methods.generateAuthToken = function () {
   const token = jwt.sign(
-    { _id: this._id, username: this.username, email: this.email, role: this.role },
+    {
+      _id: this._id,
+      username: this.username,
+      email: this.email,
+      role: this.role,
+    },
     process.env.JWT_SECRET,
-    { expiresIn: '7d' }
+    { expiresIn: "7d" }
   );
   return token;
 };
 
-const User = mongoose.model('User', userSchema);
+const User = mongoose.model("User", userSchema);
 module.exports = User;
-

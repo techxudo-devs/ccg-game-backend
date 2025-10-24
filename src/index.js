@@ -1,7 +1,7 @@
-require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+require("dotenv").config();
 const fileUpload = require("express-fileupload");
 const app = express();
 
@@ -12,7 +12,7 @@ app.use(
   fileUpload({
     useTempFiles: true,
     tempFileDir: "/tmp/",
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    limits: { fileSize: 5 * 1024 * 1024 },
   })
 );
 app.use(
