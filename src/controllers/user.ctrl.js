@@ -116,7 +116,7 @@ const UserController = {
       res.status(200).json({ message: "OTP sent successfully to your email" });
     } catch (error) {
       console.error("Forgot password error:", error);
-      res.status(500).json({ message: "Error processing request" });
+      res.status(500).json({ message: "Internal Server Error" });
     }
   },
 
@@ -157,8 +157,22 @@ const UserController = {
   resetPassword: async (req, res) => {
     try {
       const { newPassword } = req.body;
-      const tempToken = req.headers.authorization?.split(" ")[1];
+      const authHeader = req.headers.authorization;
 
+      if (!authHeader) {
+        return res
+          .status(401)
+          .json({ message: "No authorization header provided" });
+      }
+
+      const tokenParts = authHeader.split(" ");
+      if (tokenParts.length !== 2 || tokenParts[0] !== "Bearer") {
+        return res
+          .status(401)
+          .json({ message: "Invalid authorization header format" });
+      }
+
+      const tempToken = tokenParts[1];
       if (!tempToken) {
         return res.status(401).json({ message: "No token provided" });
       }
@@ -166,12 +180,19 @@ const UserController = {
       // Verify temp token
       const decoded = jwt.verify(tempToken, process.env.JWT_SECRET);
       if (decoded.purpose !== "reset-password") {
-        return res.status(401).json({ message: "Invalid token" });
+        return res.status(401).json({ message: "Invalid token purpose" });
       }
 
       const user = await UserModel.findById(decoded.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
+      }
+
+      // Validate new password
+      if (!newPassword || newPassword.length < 6) {
+        return res
+          .status(400)
+          .json({ message: "Password must be at least 6 characters long" });
       }
 
       // Set the new password (it will be hashed by the pre-save middleware)
@@ -189,7 +210,9 @@ const UserController = {
       if (error.name === "TokenExpiredError") {
         return res.status(401).json({ message: "Token expired" });
       }
-      res.status(500).json({ message: "Error resetting password" });
+      res
+        .status(500)
+        .json({ message: "Error resetting password: " + error.message });
     }
   },
 
