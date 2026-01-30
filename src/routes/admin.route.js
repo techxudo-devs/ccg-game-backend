@@ -89,4 +89,25 @@ AdminRoute.put(
   AdminController.updateSettings
 );
 
+AdminRoute.get(
+  "/searchPlayer",
+  authMiddleware,
+  RoleValidation(["admin"]),
+  AdminController.searchPlayerByName
+);
+
+AdminRoute.delete(
+  "/removePlayer/:userId",
+  authMiddleware,
+  RoleValidation(["admin"]),
+  AdminController.removePlayerFromSite
+);
+
+AdminRoute.post(
+  "/removePlayerFromFreebieGame",
+  authMiddleware,
+  RoleValidation(["admin"]),
+  AdminController.removePlayerFromFreebieGame
+);
+
 module.exports = AdminRoute;

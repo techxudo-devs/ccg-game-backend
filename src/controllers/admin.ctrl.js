@@ -722,6 +722,151 @@ const AdminController = {
       res.status(500).json({ message: "Failed to update settings" });
     }
   },
+
+  searchPlayerByName: async (req, res) => {
+    const { searchTerm } = req.query;
+
+    if (!searchTerm) {
+      return res.status(400).json({ message: "Please provide a search term" });
+    }
+
+    try {
+      const players = await UserModel.find({
+        $or: [
+          { username: { $regex: searchTerm, $options: "i" } },
+          { email: { $regex: searchTerm, $options: "i" } },
+          { name: { $regex: searchTerm, $options: "i" } },
+        ],
+      })
+        .select("_id username email name address role createdAt")
+        .sort({ createdAt: -1 });
+
+      if (!players || players.length === 0) {
+        return res.status(404).json({ message: "No players found" });
+      }
+
+      return res.status(200).json({
+        message: "Players found",
+        players,
+        count: players.length,
+      });
+    } catch (error) {
+      console.error("Error searching for players:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  },
+
+  removePlayerFromSite: async (req, res) => {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({ message: "Please provide userId" });
+    }
+
+    try {
+      const user = await UserModel.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "Player not found" });
+      }
+
+      if (user.role === "admin") {
+        return res.status(400).json({ message: "Cannot remove admin users" });
+      }
+
+      await SeatModel.updateMany(
+        { userId: userId },
+        {
+          $unset: { userId: "" },
+          isOccupied: false,
+          BookedAt: null
+        }
+      );
+
+      await GameModel.updateMany(
+        { Approved_Users: userId },
+        { $pull: { Approved_Users: userId } }
+      );
+
+      await RequestModel.deleteMany({ userId: userId });
+
+      await UserModel.findByIdAndDelete(userId);
+
+      return res.status(200).json({
+        message: "Player removed from site successfully",
+        username: user.username,
+      });
+    } catch (error) {
+      console.error("Error removing player from site:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  },
+
+  removePlayerFromFreebieGame: async (req, res) => {
+    const { userId, gameId } = req.body;
+
+    if (!userId || !gameId) {
+      return res.status(400).json({ message: "Please provide userId and gameId" });
+    }
+
+    try {
+      const user = await UserModel.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "Player not found" });
+      }
+
+      const game = await GameModel.findById(gameId);
+      if (!game) {
+        return res.status(404).json({ message: "Game not found" });
+      }
+
+      const freeSeats = await SeatModel.find({
+        _id: { $in: game.seats },
+        userId: userId,
+        price: 0
+      });
+
+      if (freeSeats.length === 0) {
+        return res.status(404).json({
+          message: "Player has no freebie seats in this game"
+        });
+      }
+
+      await SeatModel.updateMany(
+        {
+          _id: { $in: freeSeats.map(seat => seat._id) }
+        },
+        {
+          $unset: { userId: "" },
+          isOccupied: false,
+          BookedAt: null,
+          isWinner: false,
+          declaredWinnerAt: null
+        }
+      );
+
+      const remainingSeats = await SeatModel.find({
+        _id: { $in: game.seats },
+        userId: userId
+      });
+
+      if (remainingSeats.length === 0) {
+        game.Approved_Users = game.Approved_Users.filter(
+          (approvedUserId) => !approvedUserId.equals(userId)
+        );
+        await game.save();
+      }
+
+      return res.status(200).json({
+        message: "Player removed from freebie game successfully",
+        username: user.username,
+        gameName: game.gameName,
+        seatsRemoved: freeSeats.length
+      });
+    } catch (error) {
+      console.error("Error removing player from freebie game:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  },
 };
 
 async function GenerateGameID() {
