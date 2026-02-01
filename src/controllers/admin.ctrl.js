@@ -738,7 +738,7 @@ const AdminController = {
           { name: { $regex: searchTerm, $options: "i" } },
         ],
       })
-        .select("_id username email name address role createdAt")
+        .select("_id username email name address city state zipCode role createdAt")
         .sort({ createdAt: -1 });
 
       if (!players || players.length === 0) {

@@ -625,10 +625,18 @@ const UserController = {
       user.username = username;
       user.email = email;
       user.name = name;
-      user.address = address || "";
-      user.city = city || "";
-      user.state = state || "";
-      user.zipCode = zipCode || "";
+      if (address !== undefined) {
+        user.address = address || "";
+      }
+      if (city !== undefined) {
+        user.city = city || "";
+      }
+      if (state !== undefined) {
+        user.state = state || "";
+      }
+      if (zipCode !== undefined) {
+        user.zipCode = zipCode || "";
+      }
       if (newPassword) {
         user.password = newPassword;
       }
@@ -669,10 +677,18 @@ const UserController = {
         return res.status(404).json({ message: "User not found" });
       }
 
-      user.address = address || "";
-      user.city = city || "";
-      user.state = state || "";
-      user.zipCode = zipCode || "";
+      if (address !== undefined) {
+        user.address = address || "";
+      }
+      if (city !== undefined) {
+        user.city = city || "";
+      }
+      if (state !== undefined) {
+        user.state = state || "";
+      }
+      if (zipCode !== undefined) {
+        user.zipCode = zipCode || "";
+      }
       await user.save();
 
       return res.status(200).json({
