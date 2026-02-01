@@ -25,6 +25,18 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: "",
   },
+  city: {
+    type: String,
+    default: "",
+  },
+  state: {
+    type: String,
+    default: "",
+  },
+  zipCode: {
+    type: String,
+    default: "",
+  },
   resetPasswordOTP: {
     type: String,
   },

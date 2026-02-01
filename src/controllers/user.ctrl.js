@@ -217,7 +217,7 @@ const UserController = {
   },
 
   register: async (req, res) => {
-    const { username, password, email, role, name, address } = req.body;
+    const { username, password, email, role, name, address, city, state, zipCode } = req.body;
     if (!username || !password || !email || !role || !name) {
       return res.status(400).json({ message: "Please fill all the fields" });
     }
@@ -234,6 +234,9 @@ const UserController = {
         role,
         name,
         address: address || "",
+        city: city || "",
+        state: state || "",
+        zipCode: zipCode || "",
       });
       await newUser.save();
       return res.status(201).json({ message: "User created successfully" });
@@ -568,7 +571,17 @@ const UserController = {
 
   UpdateProfile: async (req, res) => {
     const userId = req.user._id;
-    const { username, email, name, currentPassword, newPassword } = req.body;
+    const {
+      username,
+      email,
+      name,
+      currentPassword,
+      newPassword,
+      address,
+      city,
+      state,
+      zipCode,
+    } = req.body;
 
     try {
       const user = await UserModel.findById(userId);
@@ -612,6 +625,10 @@ const UserController = {
       user.username = username;
       user.email = email;
       user.name = name;
+      user.address = address || "";
+      user.city = city || "";
+      user.state = state || "";
+      user.zipCode = zipCode || "";
       if (newPassword) {
         user.password = newPassword;
       }
@@ -629,6 +646,10 @@ const UserController = {
           email: user.email,
           role: user.role,
           name: user.name,
+          address: user.address,
+          city: user.city,
+          state: user.state,
+          zipCode: user.zipCode,
         },
         token,
       });
@@ -640,7 +661,7 @@ const UserController = {
 
   updateAddress: async (req, res) => {
     const userId = req.user._id;
-    const { address } = req.body;
+    const { address, city, state, zipCode } = req.body;
 
     try {
       const user = await UserModel.findById(userId);
@@ -649,11 +670,17 @@ const UserController = {
       }
 
       user.address = address || "";
+      user.city = city || "";
+      user.state = state || "";
+      user.zipCode = zipCode || "";
       await user.save();
 
       return res.status(200).json({
         message: "Address updated successfully",
         address: user.address,
+        city: user.city,
+        state: user.state,
+        zipCode: user.zipCode,
       });
     } catch (error) {
       console.error("Error updating address:", error);

@@ -671,7 +671,7 @@ const AdminController = {
 
     try {
       const users = await UserModel.find()
-        .select("_id username email role name address createdAt")
+        .select("_id username email role name address city state zipCode createdAt")
         .sort({ createdAt: -1 });
 
       if (!users) return res.status(404).json({ message: "No User Found" });
