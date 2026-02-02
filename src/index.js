@@ -13,19 +13,19 @@ app.use(
     useTempFiles: true,
     tempFileDir: "/tmp/",
     limits: { fileSize: 5 * 1024 * 1024 },
-  })
+  }),
 );
 app.use(
   cors({
     origin: [
       origin,
       "http://localhost:5174",
-      "https://precision-firearm-game.netlify.app",
+      "https://firearm-precision.netlify.app",
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
-  })
+  }),
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
