@@ -308,55 +308,65 @@ const UserController = {
       return res.status(400).json({ message: "Please fill all the fields" });
     }
     try {
-      const request = await RequestModel.findOne({ userId, gameId });
-      if (request) {
-        return res.status(400).json({ message: "Request already exists" });
-      }
-
-      const newRequest = new RequestModel({
-        userId,
-        gameId,
-      });
-
-      if (!newRequest) {
-        return res.status(400).json({ message: "Request not created" });
-      }
-
-      await newRequest.save();
-
       const game = await GameModel.findById(gameId);
       if (!game) {
         return res.status(400).json({ message: "Game not found" });
       }
 
-      // Check for auto-approval setting
-      const settings = await SettingModel.findOne();
-      if (settings && settings.autoAcceptRequests) {
-        newRequest.status = "approved";
-        await newRequest.save();
-
-        game.Approved_Users.push(userId);
-
-        const user = await UserModel.findById(userId);
-        if (user && user.email) {
-          const subject = "Request Approved";
-          const text =
-            "Your request to join the game has been automatically approved.";
-          await sendStatusUpdate(user.email, subject, text);
-        }
-
-        await game.save();
-        return res
-          .status(200)
-          .json({ message: "Request automatically approved" });
+      if (game.status === "ended") {
+        return res.status(400).json({ message: "Game has already ended" });
       }
 
-      // Original behavior: save as pending
-      game.Pending_Requests.push(newRequest._id);
+      // Check if user is already approved for this game (proper ObjectId comparison)
+      const isAlreadyApproved = game.Approved_Users.some(
+        (approvedId) => approvedId.toString() === userId.toString()
+      );
+      if (isAlreadyApproved) {
+        return res.status(200).json({ message: "Already approved", alreadyApproved: true });
+      }
+
+      // Check if request already exists
+      const existingRequest = await RequestModel.findOne({ userId, gameId });
+      if (existingRequest) {
+        // If request exists and is approved, return success
+        if (existingRequest.status === "approved") {
+          // Ensure user is in Approved_Users list
+          if (!isAlreadyApproved) {
+            game.Approved_Users.push(userId);
+            await game.save();
+          }
+          return res.status(200).json({ message: "Already approved", alreadyApproved: true });
+        }
+        // Auto-approve existing pending request
+        existingRequest.status = "approved";
+        await existingRequest.save();
+
+        game.Approved_Users.push(userId);
+        // Remove from pending requests if present
+        game.Pending_Requests = game.Pending_Requests.filter(
+          (reqId) => !reqId.equals(existingRequest._id)
+        );
+        await game.save();
+        return res.status(200).json({ message: "Request approved", alreadyApproved: true });
+      }
+
+      // Create new request and auto-approve immediately (no email sent)
+      const newRequest = new RequestModel({
+        userId,
+        gameId,
+        status: "approved", // Auto-approve immediately
+      });
+
+      await newRequest.save();
+
+      // Add user to approved list directly
+      game.Approved_Users.push(userId);
       await game.save();
-      return res.status(201).json({ message: "Request created successfully" });
+
+      return res.status(200).json({ message: "Request approved", alreadyApproved: true });
     } catch (error) {
-      return res.status(500).json({ message: error.message });
+      console.error("MakeRequest Error:", error);
+      return res.status(500).json({ message: "Internal server error" });
     }
   },
   CreatePaymentIntent: async (req, res) => {

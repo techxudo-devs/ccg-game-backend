@@ -40,13 +40,16 @@ const GameController = {
         .populate("seats")
         .populate("Approved_Users")
         .populate("Pending_Requests")
-        .sort({ createdAt: -1 });
+        .sort({ createdAt: -1 })
+        .lean(); // Use lean() for better performance
+
+      // Return empty array instead of 404 for no games (prevents frontend errors)
       if (!games || games.length === 0) {
-        return res.status(404).json({ message: "No active games found" });
+        return res.status(200).json([]);
       }
       return res.status(200).json(games);
     } catch (error) {
-      console.error(error);
+      console.error("ListActiveGames Error:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
   },
@@ -56,13 +59,16 @@ const GameController = {
       const games = await GameModel.find({ status: "ended" })
         .populate("seats")
         .populate("Approved_Users")
-        .sort({ createdAt: -1 });
+        .sort({ createdAt: -1 })
+        .lean();
+
+      // Return empty array instead of 404 for no games
       if (!games || games.length === 0) {
-        return res.status(404).json({ message: "No active games found" });
+        return res.status(200).json([]);
       }
       return res.status(200).json(games);
     } catch (error) {
-      console.error(error);
+      console.error("ListNonActiveGames Error:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
   },
@@ -73,17 +79,17 @@ const GameController = {
         .populate("seats")
         .populate("Approved_Users")
         .sort({ createdAt: -1 })
-        .limit(1);
+        .limit(1)
+        .lean();
 
       if (!games || games.length === 0) {
-        return res.status({ message: "No Ended Game Found" });
+        return res.status(200).json({ message: "No Ended Game Found", game: [] });
       }
 
       return res.status(200).json({ message: "Latest Game", game: games });
     } catch (error) {
-      return res
-        .status(500)
-        .json({ message: "Internal Server Error", error: error.message });
+      console.error("ListLatestNonActiveGame Error:", error);
+      return res.status(500).json({ message: "Internal Server Error" });
     }
   },
 
