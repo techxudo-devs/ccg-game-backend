@@ -297,8 +297,11 @@ const UserController = {
         },
       });
     } catch (error) {
-      console.error(error);
-      return res.status(500).json({ message: "Internal server error" });
+      console.error("Login error:", error);
+      return res.status(500).json({
+        message: error.message || "Internal server error",
+        error: error.name || "UnknownError",
+      });
     }
   },
   MakeRequest: async (req, res) => {
