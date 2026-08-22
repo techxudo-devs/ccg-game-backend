@@ -39,6 +39,7 @@ mongoose
 const UserRoute = require("./routes/user.route");
 const AdminRoute = require("./routes/admin.route");
 const GameRoute = require("./routes/game.route");
+const LiveStreamRoute = require("./routes/liveStream.route");
 
 app.get("/", (req, res) => {
   return res.status(200).json({
@@ -50,6 +51,7 @@ app.get("/", (req, res) => {
 app.use("/api/user", UserRoute);
 app.use("/api/admin", AdminRoute);
 app.use("/api/game", GameRoute);
+app.use("/api/live-stream", LiveStreamRoute);
 
 //server startup
 const PORT = process.env.PORT || 5000;
