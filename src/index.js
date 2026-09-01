@@ -1,8 +1,8 @@
 const express = require("express");
-const mongoose = require("mongoose");
 const cors = require("cors");
 require("dotenv").config();
 const fileUpload = require("express-fileupload");
+const { connectDB, isDatabaseConnected } = require("./database/mongoose");
 const app = express();
 
 const origin = process.env.ORIGIN || "http://localhost:5173";
@@ -30,11 +30,6 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.log(err));
-
 //routes
 const UserRoute = require("./routes/user.route");
 const AdminRoute = require("./routes/admin.route");
@@ -45,7 +40,25 @@ app.get("/", (req, res) => {
   return res.status(200).json({
     status: true,
     message: "Game Server is Running",
+    database: isDatabaseConnected() ? "connected" : "disconnected",
   });
+});
+
+// Ensure MongoDB is connected before API controllers run
+app.use(async (req, res, next) => {
+  if (req.method === "OPTIONS") {
+    return next();
+  }
+
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    return res.status(503).json({
+      status: false,
+      message: "Database connection is currently unavailable",
+    });
+  }
 });
 
 app.use("/api/user", UserRoute);
