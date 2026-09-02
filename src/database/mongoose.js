@@ -1,40 +1,43 @@
 const mongoose = require("mongoose");
 
+mongoose.set("bufferCommands", false);
+
 const MONGO_URI = process.env.MONGO_URI;
 
-if (!MONGO_URI) {
-  throw new Error("MONGO_URI is not defined in environment variables");
-}
-
-// Reuse connection across Vercel serverless invocations (global cache).
+// Reuse connection across Vercel serverless invocations.
 let cached = global.mongoose;
-
 if (!cached) {
   cached = global.mongoose = { conn: null, promise: null };
 }
 
 async function connectDB() {
-  if (cached.conn) {
+  if (cached.conn && mongoose.connection.readyState === 1) {
     return cached.conn;
+  }
+
+  if (!MONGO_URI) {
+    throw new Error("MONGO_URI is not defined in environment variables");
   }
 
   if (!cached.promise) {
     cached.promise = mongoose
       .connect(MONGO_URI, {
-        // Prevent operations from buffering when DB is not connected (fixes 10000ms timeout).
         bufferCommands: false,
+        maxPoolSize: 10,
+        minPoolSize: 0,
         serverSelectionTimeoutMS: 10000,
         socketTimeoutMS: 45000,
-        maxPoolSize: 10,
       })
       .then((mongooseInstance) => {
         console.log("MongoDB connected");
+        cached.conn = mongooseInstance;
         return mongooseInstance;
       })
-      .catch((err) => {
+      .catch((error) => {
         cached.promise = null;
-        console.error("MongoDB connection error:", err.message);
-        throw err;
+        cached.conn = null;
+        console.error("MongoDB connection failed:", error.message);
+        throw error;
       });
   }
 
@@ -42,15 +45,18 @@ async function connectDB() {
   return cached.conn;
 }
 
+function isDatabaseConnected() {
+  return mongoose.connection.readyState === 1;
+}
+
 function getDbStatus() {
-  const state = mongoose.connection.readyState;
   const states = {
     0: "disconnected",
     1: "connected",
     2: "connecting",
     3: "disconnecting",
   };
-  return states[state] || "unknown";
+  return states[mongoose.connection.readyState] || "unknown";
 }
 
-module.exports = { connectDB, getDbStatus };
+module.exports = { connectDB, isDatabaseConnected, getDbStatus };

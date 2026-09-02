@@ -5,7 +5,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "reset-admin-password": "node scripts/reset-admin-password.js"
+    "reset-admin-password": "node scripts/reset-admin-password.js",
+    "reset-admin": "node scripts/reset-admin.js"
   },
   "author": "",
   "license": "ISC",

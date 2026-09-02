@@ -3,7 +3,7 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 const fileUpload = require("express-fileupload");
-const { connectDB, getDbStatus } = require("./config/db");
+const { connectDB, getDbStatus } = require("./database/mongoose");
 const ensureDbConnection = require("./middleware/db");
 
 const app = express();
@@ -36,6 +36,7 @@ app.use(express.urlencoded({ extended: true }));
 const UserRoute = require("./routes/user.route");
 const AdminRoute = require("./routes/admin.route");
 const GameRoute = require("./routes/game.route");
+const LiveStreamRoute = require("./routes/liveStream.route");
 
 app.get("/", async (req, res) => {
   try {
@@ -60,6 +61,7 @@ app.use("/api", ensureDbConnection);
 app.use("/api/user", UserRoute);
 app.use("/api/admin", AdminRoute);
 app.use("/api/game", GameRoute);
+app.use("/api/live-stream", LiveStreamRoute);
 
 const PORT = process.env.PORT || 5000;
 

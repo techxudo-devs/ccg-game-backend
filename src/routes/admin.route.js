@@ -1,6 +1,7 @@
 const express = require("express");
 const AdminRoute = express.Router();
 const AdminController = require("../controllers/admin.ctrl");
+const LiveStreamController = require("../controllers/liveStream.ctrl");
 const RoleValidation = require("../middleware/roleValidator");
 const authMiddleware = require("../middleware/auth");
 const { handleImageUpload } = require("../middleware/upload");
@@ -108,6 +109,43 @@ AdminRoute.post(
   authMiddleware,
   RoleValidation(["admin"]),
   AdminController.removePlayerFromFreebieGame
+);
+
+AdminRoute.post(
+  "/live-streams",
+  authMiddleware,
+  RoleValidation(["admin"]),
+  LiveStreamController.create
+);
+AdminRoute.get(
+  "/live-streams",
+  authMiddleware,
+  RoleValidation(["admin"]),
+  LiveStreamController.listAdmin
+);
+AdminRoute.put(
+  "/live-streams/:id/go-live",
+  authMiddleware,
+  RoleValidation(["admin"]),
+  LiveStreamController.goLive
+);
+AdminRoute.put(
+  "/live-streams/:id/end",
+  authMiddleware,
+  RoleValidation(["admin"]),
+  LiveStreamController.end
+);
+AdminRoute.put(
+  "/live-streams/:id",
+  authMiddleware,
+  RoleValidation(["admin"]),
+  LiveStreamController.update
+);
+AdminRoute.delete(
+  "/live-streams/:id",
+  authMiddleware,
+  RoleValidation(["admin"]),
+  LiveStreamController.remove
 );
 
 module.exports = AdminRoute;
