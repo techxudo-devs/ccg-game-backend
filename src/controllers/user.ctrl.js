@@ -251,12 +251,17 @@ const UserController = {
       return res.status(400).json({ message: "Please fill all the fields" });
     }
     try {
+      const normalizedEmail = email.trim().toLowerCase();
+
       if (role !== "user" && role !== "admin") {
         return res.status(400).json({ message: "Invalid role" });
       }
 
       if (role === "admin") {
-        const admin = await UserModel.findOne({ email, role });
+        const admin = await UserModel.findOne({
+          email: normalizedEmail,
+          role: "admin",
+        });
         if (!admin) {
           return res.status(400).json({ message: "Admin not found" });
         }
@@ -276,8 +281,21 @@ const UserController = {
         });
       }
 
-      const user = await UserModel.findOne({ email, role });
+      const user = await UserModel.findOne({
+        email: normalizedEmail,
+        role: "user",
+      });
       if (!user) {
+        const adminAccount = await UserModel.findOne({
+          email: normalizedEmail,
+          role: "admin",
+        });
+        if (adminAccount) {
+          return res.status(400).json({
+            message:
+              "This account is an admin account. Please use the admin login page.",
+          });
+        }
         return res.status(400).json({ message: "User not found" });
       }
       const isMatch = await user.comparePassword(password);
